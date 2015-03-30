@@ -1397,10 +1397,22 @@ static int select_input_picture(MpegEncContext *s)
 
         if (/*s->picture_in_gop_number >= s->gop_size ||*/
             !s->next_picture_ptr || s->intra_only) {
-            s->reordered_input_picture[0] = s->input_picture[0];
+
+            // get number of B images at the beginning
+            // @todo: add an mpeg2video parameter to set this value
+            int b_frames = 2;
+
+            // force first image as I
+            s->reordered_input_picture[0] = s->input_picture[b_frames];
             s->reordered_input_picture[0]->f->pict_type = AV_PICTURE_TYPE_I;
-            s->reordered_input_picture[0]->f->coded_picture_number =
-                s->coded_picture_number++;
+            s->reordered_input_picture[0]->f->coded_picture_number = s->coded_picture_number++;
+
+            // add B_back images to the encoders
+            for (i = 0; i < b_frames; i++) {
+                s->reordered_input_picture[i + 1] = s->input_picture[i];
+                s->reordered_input_picture[i + 1]->f->pict_type = AV_PICTURE_TYPE_B;
+                s->reordered_input_picture[i + 1]->f->coded_picture_number = s->coded_picture_number++;
+            }
         } else {
             int b_frames;
 
@@ -1472,16 +1484,19 @@ static int select_input_picture(MpegEncContext *s)
                 if ((s->mpv_flags & FF_MPV_FLAG_STRICT_GOP) &&
                     s->gop_size > s->picture_in_gop_number) {
                     b_frames = s->gop_size - s->picture_in_gop_number - 1;
-                } else {
-                    if (s->flags & CODEC_FLAG_CLOSED_GOP)
-                        b_frames = 0;
-                    s->input_picture[b_frames]->f->pict_type = AV_PICTURE_TYPE_I;
                 }
+                // a CLOSED_GOP can start with B frames
+//                else {
+//                    if (s->flags & CODEC_FLAG_CLOSED_GOP)
+//                        b_frames = 0;
+//                }
+                s->input_picture[b_frames]->f->pict_type = AV_PICTURE_TYPE_I;
             }
 
-            if ((s->flags & CODEC_FLAG_CLOSED_GOP) && b_frames &&
-                s->input_picture[b_frames]->f->pict_type == AV_PICTURE_TYPE_I)
-                b_frames--;
+            // a CLOSED_GOP can start with B frames
+//            if ((s->flags & CODEC_FLAG_CLOSED_GOP) && b_frames &&
+//                s->input_picture[b_frames]->f->pict_type == AV_PICTURE_TYPE_I)
+//                b_frames--;
 
             s->reordered_input_picture[0] = s->input_picture[b_frames];
             if (s->reordered_input_picture[0]->f->pict_type != AV_PICTURE_TYPE_I)

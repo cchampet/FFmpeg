@@ -1528,10 +1528,17 @@ void ff_estimate_b_frame_motion(MpegEncContext * s,
     MotionEstContext * const c= &s->me;
     const int penalty_factor= c->mb_penalty_factor;
     int fmin, bmin, dmin, fbmin, bimin, fimin;
+    fmin= bmin= dmin= fbmin= bimin= fimin= INT_MAX;
     int type=0;
     const int xy = mb_y*s->mb_stride + mb_x;
     init_ref(c, s->new_picture.f->data, s->last_picture.f->data,
              s->next_picture.f->data, 16 * mb_x, 16 * mb_y, 2);
+
+    int f_est = 0;
+    // skip forward estimation when encoder try to estimate the first group of B-picture (closed GOP!)
+    if( s->coded_picture_number % 12 != 3 )
+        f_est = s->last_picture.f->pict_type != AV_PICTURE_TYPE_NONE;
+    const int b_est = s->next_picture.f->pict_type != AV_PICTURE_TYPE_NONE;
 
     get_limits(s, 16*mb_x, 16*mb_y);
 
@@ -1550,35 +1557,44 @@ void ff_estimate_b_frame_motion(MpegEncContext * s,
 
     if (s->codec_id == AV_CODEC_ID_MPEG4)
         dmin= direct_search(s, mb_x, mb_y);
-    else
-        dmin= INT_MAX;
+
+    if(f_est){
 //FIXME penalty stuff for non mpeg4
-    c->skip=0;
-    fmin = estimate_motion_b(s, mb_x, mb_y, s->b_forw_mv_table, 0, s->f_code) +
+        c->skip=0;
+        fmin = estimate_motion_b(s, mb_x, mb_y, s->b_forw_mv_table, 0, s->f_code) +
            3 * penalty_factor;
+        av_dlog(s, " %d %d ", s->b_forw_mv_table[xy][0], s->b_forw_mv_table[xy][1]);
+    }
+    else
 
-    c->skip=0;
-    bmin = estimate_motion_b(s, mb_x, mb_y, s->b_back_mv_table, 2, s->b_code) +
-           2 * penalty_factor;
-    av_dlog(s, " %d %d ", s->b_forw_mv_table[xy][0], s->b_forw_mv_table[xy][1]);
+    if(b_est){
+        c->skip=0;
+        bmin = estimate_motion_b(s, mb_x, mb_y, s->b_back_mv_table, 2, s->b_code) +
+               2 * penalty_factor;
+    }
 
-    c->skip=0;
-    fbmin= bidir_refine(s, mb_x, mb_y) + penalty_factor;
-    av_dlog(s, "%d %d %d %d\n", dmin, fmin, bmin, fbmin);
+    if(f_est && b_est){
+        c->skip=0;
+        fbmin= bidir_refine(s, mb_x, mb_y) + penalty_factor;
+        av_dlog(s, "%d %d %d %d\n", dmin, fmin, bmin, fbmin);
+    }
 
     if(s->flags & CODEC_FLAG_INTERLACED_ME){
+        if(f_est){
 //FIXME mb type penalty
-        c->skip=0;
-        c->current_mv_penalty= c->mv_penalty[s->f_code] + MAX_MV;
-        fimin= interlaced_search(s, 0,
-                                 s->b_field_mv_table[0], s->b_field_select_table[0],
-                                 s->b_forw_mv_table[xy][0], s->b_forw_mv_table[xy][1], 0);
-        c->current_mv_penalty= c->mv_penalty[s->b_code] + MAX_MV;
-        bimin= interlaced_search(s, 2,
-                                 s->b_field_mv_table[1], s->b_field_select_table[1],
-                                 s->b_back_mv_table[xy][0], s->b_back_mv_table[xy][1], 0);
-    }else
-        fimin= bimin= INT_MAX;
+            c->skip=0;
+            c->current_mv_penalty= c->mv_penalty[s->f_code] + MAX_MV;
+            fimin= interlaced_search(s, 0,
+                                     s->b_field_mv_table[0], s->b_field_select_table[0],
+                                     s->b_forw_mv_table[xy][0], s->b_forw_mv_table[xy][1], 0);
+        }
+        if(b_est){
+            c->current_mv_penalty= c->mv_penalty[s->b_code] + MAX_MV;
+            bimin= interlaced_search(s, 2,
+                                     s->b_field_mv_table[1], s->b_field_select_table[1],
+                                     s->b_back_mv_table[xy][0], s->b_back_mv_table[xy][1], 0);
+        }
+    }
 
     {
         int score= fmin;
