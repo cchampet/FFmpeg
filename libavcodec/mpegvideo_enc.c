@@ -1473,15 +1473,15 @@ static int select_input_picture(MpegEncContext *s)
                     s->gop_size > s->picture_in_gop_number) {
                     b_frames = s->gop_size - s->picture_in_gop_number - 1;
                 } else {
-                    if (s->flags & CODEC_FLAG_CLOSED_GOP)
-                        b_frames = 0;
+//                    if (s->flags & CODEC_FLAG_CLOSED_GOP)
+//                        b_frames = 0;
                     s->input_picture[b_frames]->f->pict_type = AV_PICTURE_TYPE_I;
                 }
             }
 
-            if ((s->flags & CODEC_FLAG_CLOSED_GOP) && b_frames &&
-                s->input_picture[b_frames]->f->pict_type == AV_PICTURE_TYPE_I)
-                b_frames--;
+//            if ((s->flags & CODEC_FLAG_CLOSED_GOP) && b_frames &&
+//                s->input_picture[b_frames]->f->pict_type == AV_PICTURE_TYPE_I)
+//                b_frames--;
 
             s->reordered_input_picture[0] = s->input_picture[b_frames];
             if (s->reordered_input_picture[0]->f->pict_type != AV_PICTURE_TYPE_I)
