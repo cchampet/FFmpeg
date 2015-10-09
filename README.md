@@ -40,3 +40,7 @@ Coding examples are available in the **doc/examples** directory.
 
 FFmpeg codebase is mainly LGPL-licensed with optional components licensed under
 GPL. Please refer to the LICENSE file for detailed information.
+
+
+[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/cchampet/ffmpeg/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
+
